@@ -96,37 +96,69 @@ const DragAndDropUploader: React.FC = () => {
   };
 
   // Handle file upload to the server
-  const handleUpload = async () => {
-    if (tempFile && !isUploading && selectedValue !== "Select Clothing Type") {
-      setIsUploading(true); // Disable the button and prevent multiple clicks
+// Handle file upload to the server
+const handleUpload = async () => {
+  if (tempFile && !isUploading && selectedValue !== "Select Clothing Type") {
+    setIsUploading(true); // Disable the button and prevent multiple clicks
 
-      const formData = new FormData();
-      formData.append("file", tempFile);
-      formData.append("type", selectedValue); // Send selected type to the server
+    const formData = new FormData();
+    formData.append("file", tempFile);
+    formData.append("type", selectedValue); // Send selected type to the server
 
-      try {
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          // Add the uploaded file and its associated type to the files state
-          setFiles((prevFiles) => [...prevFiles, { image_path: data.fileName, category_name: selectedValue }]);
+      if (response.ok) {
+        const data = await response.json();
+        const uploadedFileName = data.fileName; // Capture the uploaded file name returned by the server
+        console.log(uploadedFileName)
+
+        // Add the uploaded file and its associated type to the files state
+        setFiles((prevFiles) => [...prevFiles, { image_path: uploadedFileName, category_name: selectedValue }]);
+
+        // Now use the uploaded file name (instead of tempFile.name) in the next POST request
+        try {
+          const response = await fetch("http://0.0.0.0:8000/rest/post1", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              category_name: selectedValue,
+              image_path: uploadedFileName, // Use the dynamically received file name
+            }),
+            mode: "no-cors",
+          });
+        
+          if (response.ok) {
+            const responseData = await response.json();
+            console.log("Success:", responseData);
+          } else {
+            console.error("Failed to send data to the server", response.statusText);
+          }
+        } catch (error) {
+          console.error("Error making the request:", error);
         }
-      } catch (error) {
-        console.error("Failed to upload file", error);
+
+      } else {
+        console.error("Failed to upload file to the server", response.statusText);
       }
-
-      setTempFile(null);
-      setVisible(false);
-
-      // Add a sleep function to avoid rapid submissions
-      await sleep(500); // Sleep for 500ms before re-enabling the button
-      setIsUploading(false);
+    } catch (error) {
+      console.error("Failed to upload file", error);
     }
-  };
+
+    setTempFile(null);
+    setVisible(false);
+
+    // Add a sleep function to avoid rapid submissions
+    await sleep(500); // Sleep for 500ms before re-enabling the button
+    setIsUploading(false);
+  }
+};
+
 
   return (
     <div className="p-10 min-h-screen min-w-max flex justify-center items-center">

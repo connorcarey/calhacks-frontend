@@ -1,0 +1,14 @@
+{
+    "user": {
+        "identity_key": "6e2c459790fd38d30130102e44f3f75a202451f33069be83261b38cc6977060b",
+        "wallet_key": "qzSMBBFD98rL0KsS9L7GQepOJbG4Ths6oKoml08MGto="
+    },
+    "ImageAgent": {
+        "identity_key": "873f206dcf197d498ddc87b6196ff8759ee4f3efe06aaafc16cb306a2d873d16",
+        "wallet_key": "BOkjV3PnYMdVrI2N7I8z8qBvMMjmCO7ZFTWH1leRnEs="
+    },
+    "OutfitAgent": {
+        "identity_key": "8c51e56ef96bea24315866d034e4657ab5b4c48362be037a59a7ed2d5f92cdc6",
+        "wallet_key": "ozWx1POjQewCiULLX4hMNIXqs2QmUzWyVWalDF18iVA="
+    }
+}
