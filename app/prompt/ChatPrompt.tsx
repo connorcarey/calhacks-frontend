@@ -51,7 +51,7 @@ export default function ChatInput() {
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Message ChatGPT"
+                        placeholder="Input what style you're going for or what occasion"
                         className="flex-grow bg-transparent outline-none text-gray-700 placeholder-gray-500"
                     />
 
