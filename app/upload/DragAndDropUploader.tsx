@@ -1,4 +1,4 @@
-"use client"; // Enables React Server Components in Next.js (client-side only rendering)
+"use client";
 
 import {
   Card,
@@ -15,20 +15,31 @@ import {
   DropdownTrigger,
   DropdownItem,
   CardFooter,
-} from "@nextui-org/react"; // Import NextUI components
-import { useState, useMemo } from "react"; // Import useState hook from React for managing state
+} from "@nextui-org/react";
+import { useState, useMemo, useEffect, DragEvent, ChangeEvent } from "react";
 import type { Selection } from "@nextui-org/react";
 
-// Define the functional component using React.FC (React Function Component)
+// Define the type for the files array
+interface UploadedFile {
+  image_path: string;
+  category_name: string;
+}
+
+// Utility function to add delay (sleep)
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const DragAndDropUploader: React.FC = () => {
   // State for managing uploaded files with clothing type information
-  const [files, setFiles] = useState<Array<{ file: File; type: string }>>([]);
+  const [files, setFiles] = useState<UploadedFile[]>([]);
 
   // State for managing the file that is temporarily stored until the form is submitted
   const [tempFile, setTempFile] = useState<File | null>(null);
 
   // State for managing modal visibility
   const [visible, setVisible] = useState(false);
+
+  // State for tracking if an upload is in progress
+  const [isUploading, setIsUploading] = useState(false);
 
   // State for the selected dropdown value
   const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set(["Select Clothing Type"]));
@@ -38,146 +49,179 @@ const DragAndDropUploader: React.FC = () => {
     [selectedKeys]
   );
 
-  // Function to handle file drop event
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); // Prevent the default browser behavior for file drop
-    const newFiles = Array.from(e.dataTransfer.files) as File[]; // Convert the dropped files to an array of File objects
-    setTempFile(newFiles[0]); // Store the dropped file temporarily in tempFile
-    setVisible(true); // Show the modal
-  };
-
-  // Function to handle click event for manually selecting files (opens a file picker)
-  const handleClick = () => {
-    const fileInput = document.createElement("input"); // Dynamically create an <input> element
-    fileInput.type = "file"; // Set the input type to 'file' for file uploads
-    fileInput.multiple = false; // Allow selecting multiple files
-    fileInput.accept = "image/*"; // Restrict file selection to image types only
-
-    // Event handler for when files are selected via the file picker
-    fileInput.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement; // Type assertion to ensure TypeScript knows e.target is an HTML input
-      const newFiles = target.files ? Array.from(target.files) as File[] : []; // Get selected files, if any, and convert to array
-      setTempFile(newFiles[0]); // Store the selected file temporarily
-      setVisible(true); // Show the modal
+  // Load saved data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetch("/uploads/metadata.json");
+        if (response.ok) {
+          const metadata: UploadedFile[] = await response.json();
+          setFiles(metadata);
+        }
+      } catch (error) {
+        console.error("Failed to load metadata", error);
+      }
     };
+    loadData();
+  }, []);
 
-    fileInput.click(); // Programmatically trigger the file input click, which opens the file picker
-  };
-
-  // Function to prevent default browser behavior when dragging files over the drop zone
-  const preventDefault = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
-
-  // Function to handle the "Upload" button in the modal
-  const handleUpload = () => {
-    if (tempFile) {
-      // Add the temporary file and selected clothing type to the main files state
-      setFiles((prevFiles) => [...prevFiles, { file: tempFile, type: selectedValue }]);
-      setTempFile(null); // Clear the temporary file
+  // Handle file drop
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const newFiles = Array.from(e.dataTransfer.files); // Extract files from the drop event
+    if (newFiles.length > 0) {
+      setTempFile(newFiles[0]); // Set the first file as the temp file to be uploaded
+      setVisible(true); // Open the modal to select the clothing type
     }
-    setVisible(false); // Close the modal
   };
 
-  // Function to handle the "Cancel" button in the modal
-  const handleCancel = () => {
-    setTempFile(null); // Clear the temporary file
-    setVisible(false); // Close the modal
+  // Handle file selection from the file input
+  const handleFileSelection = (e: ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
+      setTempFile(selectedFiles[0]); // Set the selected file as the temp file
+      setVisible(true); // Show the modal
+    }
   };
 
-  // JSX structure for rendering the component
+  // Prevent default behavior for drag over
+  const preventDefault = (e: DragEvent<HTMLDivElement>) => e.preventDefault();
+
+  // Handle click on the drop zone (to trigger file explorer)
+  const handleClick = () => {
+    const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click(); // Programmatically trigger the file input click
+    }
+  };
+
+  // Handle file upload to the server
+  const handleUpload = async () => {
+    if (tempFile && !isUploading && selectedValue !== "Select Clothing Type") {
+      setIsUploading(true); // Disable the button and prevent multiple clicks
+
+      const formData = new FormData();
+      formData.append("file", tempFile);
+      formData.append("type", selectedValue); // Send selected type to the server
+
+      try {
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Add the uploaded file and its associated type to the files state
+          setFiles((prevFiles) => [...prevFiles, { image_path: data.fileName, category_name: selectedValue }]);
+        }
+      } catch (error) {
+        console.error("Failed to upload file", error);
+      }
+
+      setTempFile(null);
+      setVisible(false);
+
+      // Add a sleep function to avoid rapid submissions
+      await sleep(500); // Sleep for 500ms before re-enabling the button
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="p-10 min-h-screen min-w-max flex justify-center items-center">
-      {/* Outer container for the drag-and-drop area */}
       <div className="p-5 bg-neutral-800 flex-auto h-[600px] min-w-[300px] w-full max-w-[1000px] rounded-xl flex flex-col space-y-5">
+        <h1 className="text-3xl font-extrabold">Wardrobe</h1>
 
-        {/* Title for the uploader */}
-        <h1 className="text-large font-extrabold">Wardrobe</h1>
+        {/* Invisible file input for click-to-upload */}
+        <input
+          id="fileInput"
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handleFileSelection} // Handle file selection
+        />
 
-        {/* The drop zone where users can drop or click to upload files */}
         <div
           className="flex-grow outline-dashed outline-neutral-600 bg-neutral-900 rounded-lg p-5"
-          onDrop={handleDrop} // When a file is dropped, this triggers the handleDrop function
-          onDragOver={preventDefault} // Prevent default behavior on dragging files over the drop zone
-          onClick={handleClick} // Trigger file picker on click
+          onDrop={handleDrop} // Handle file drop
+          onDragOver={preventDefault} // Prevent default drag-over behavior
+          onClick={handleClick} // Trigger file explorer on click
         >
-          {/* Instructional text displayed in the drop zone */}
           <p className="text-center text-neutral-400">Click or drag to upload images</p>
 
-          {/* Scrollable Grid for displaying uploaded images */}
           <ScrollShadow
-            className="grid overflow-y-auto" // CSS classes for layout and scrollability
+            className="grid overflow-y-auto"
             style={{
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', // Dynamic grid that adjusts the number of columns based on container width
-              gap: '10px', // Space between grid items
-              maxHeight: '400px', // Sets the height limit for the scrollable grid
-              padding: '10px' // Padding around the grid content
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '10px',
+              maxHeight: '400px',
+              padding: '10px',
             }}
           >
-            {/* Map over the files array to generate a card for each uploaded image */}
+            {/* Iterate over the files and render each one */}
             {files.map((fileObj, index) => (
               <Card
-                key={index} // Unique key for each card (important for React rendering)
-                isFooterBlurred // NextUI property to add a blurred footer effect (optional)
-                radius="lg" // Sets the border-radius of the card
-                className="border-none" // Removes the default border styling from the card
-                style={{ width: '150px', height: '150px' }} // Force the card to be a fixed square size (150x150 pixels)
+                key={index} // Unique key for each card
+                isFooterBlurred // Add a blurred footer
+                radius="lg"
+                className="border-none relative overflow-hidden"
+                style={{ width: '150px', height: '150px', position: 'relative' }} // Force the card to be a fixed square size (150x150 pixels)
               >
-                {/* Display the image inside the card */}
                 <Image
-                  src={URL.createObjectURL(fileObj.file)} // Create a URL for the uploaded image file
-                  alt={fileObj.file.name} // Alt text for accessibility using the file's name
-                  width="100%" // Ensure the image takes up the full width of the card
-                  height="100%" // Ensure the image takes up the full height of the card
+                  src={`/uploads/${fileObj.image_path}`} // Load image from the uploaded files
+                  alt={fileObj.category_name}
+                  width="100%"
+                  height="100%"
                 />
-                {/* Blurred footer to display the selected clothing type */}
-                <CardFooter className="justify-center text-center before:bg-white/10 border-white/20 border-1 overflow-hidden py-1 absolute before:rounded-xl rounded-large bottom-1 w-[calc(100%_-_8px)] shadow-small ml-1 z-10">
-                  <p>{fileObj.type}</p> {/* Centered text displaying the clothing type */}
+                {/* Blurred footer with centered text */}
+                <CardFooter
+                  className="justify-center text-center before:bg-white/10 border-white/20 border-1 overflow-hidden py-1 absolute before:rounded-xl rounded-large bottom-1 w-[calc(100%_-_8px)] shadow-small ml-1 z-10"
+                >
+                  <p className="font-semibold text-white text-sm">{fileObj.category_name}</p> {/* Display the clothing type */}
                 </CardFooter>
               </Card>
             ))}
           </ScrollShadow>
         </div>
 
-        {/* Modal Component */}
         <Modal
-          closeButton={false} // Disable the close button
-          isOpen={visible} // Modal visibility controlled by visible state
-          isDismissable={false} // Prevent closing by clicking outside or pressing escape
+          closeButton={false}
+          isOpen={visible}
+          isDismissable={false}
           hideCloseButton={true}
-          aria-labelledby="modal-title" // Accessibility identifier
-          size="xs" // Small size
+          size="xs"
         >
           <ModalContent>
-            <ModalHeader>
-              Clothing Type
-            </ModalHeader>
+            <ModalHeader>Clothing Type</ModalHeader>
             <ModalBody>
               <Dropdown>
                 <DropdownTrigger>
-                  <Button>
-                    {selectedValue}
-                  </Button>
+                  <Button>{selectedValue}</Button>
                 </DropdownTrigger>
                 <DropdownMenu
                   aria-label="Multiple selection example"
                   variant="flat"
-                  closeOnSelect={false}
                   disallowEmptySelection
                   selectionMode="single"
                   selectedKeys={selectedKeys}
-                  onSelectionChange={setSelectedKeys}>
-                    <DropdownItem key="Shirt">Shirt</DropdownItem>
-                    <DropdownItem key="Pants">Pants</DropdownItem>
-                    <DropdownItem key="Accessory">Accessory</DropdownItem>
-                    <DropdownItem key="Shoes">Shoes</DropdownItem>
+                  onSelectionChange={setSelectedKeys}
+                >
+                  <DropdownItem key="Shirt">Shirt</DropdownItem>
+                  <DropdownItem key="Pants">Pants</DropdownItem>
+                  <DropdownItem key="Accessory">Accessory</DropdownItem>
+                  <DropdownItem key="Shoes">Shoes</DropdownItem>
                 </DropdownMenu>
               </Dropdown>
             </ModalBody>
             <ModalFooter>
-              <Button color="danger" variant="light" onPress={handleCancel}>
-                Cancel
-              </Button>
-              <Button color="success" onPress={handleUpload}>
-                Upload
+              <Button color="danger" onPress={() => setVisible(false)}>Cancel</Button>
+              <Button 
+                color="success" 
+                onPress={handleUpload} 
+                disabled={isUploading || selectedValue === "Select Clothing Type"} // Disable if uploading or no valid selection
+              >
+                {isUploading ? "Uploading..." : "Upload"} {/* Change text when uploading */}
               </Button>
             </ModalFooter>
           </ModalContent>
@@ -187,4 +231,4 @@ const DragAndDropUploader: React.FC = () => {
   );
 };
 
-export default DragAndDropUploader; // Export the component for use in other parts of the app
+export default DragAndDropUploader;

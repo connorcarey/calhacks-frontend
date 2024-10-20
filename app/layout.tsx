@@ -1,5 +1,6 @@
 import "@/styles/globals.css";
 import { Metadata, Viewport } from "next";
+import { Nunito_Sans } from "next/font/google";
 import { Link } from "@nextui-org/link";
 import clsx from "clsx";
 
@@ -26,12 +27,17 @@ export const viewport: Viewport = {
   ],
 };
 
+const nunito_sans = Nunito_Sans({
+  subsets: ['latin'],
+  // weight: ['200', '300', '400', '500', '600', '700', '800', '900', '1000']
+});
+
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en">
       <body>
         <Providers>
-          <main>
+          <main className={nunito_sans.className}>
             {children}
           </main>
         </Providers>
