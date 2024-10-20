@@ -10,7 +10,7 @@ export default function ChatInput() {
 
     const handleSubmit = () => {
         if (value.trim()) {
-            setMessages((prevMessages) => [value, ...prevMessages]);
+            setMessages((prevMessages) => [...prevMessages, value]);
             setValue('');
         }
     };
