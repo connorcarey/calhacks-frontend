@@ -30,8 +30,8 @@ const DragAndDropUploader: React.FC = () => {
   };
 
   return (
-    <div className='min-h-screen'>
-      <div className='border-2 border-dashed rounded-md text-center'>
+    <div className='min-h-screen flex'>
+      <div className='bg-white'>
         <p>Blank</p>
       </div>
     </div>
